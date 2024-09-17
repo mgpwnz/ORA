@@ -173,6 +173,8 @@ CONFIRM_TASK_TTL=2592000000
 CONFIRM_TASK_DONE_TTL = 2592000000 # comment out -> no ttl limit
 CONFIRM_CC_TTL=2592000000 # 1 month in ms
 EOF
+#memory
+sysctl vm.overcommit_memory=1
 #Run nnode
 docker compose -f $HOME/tora/docker-compose.yml up -d
 }
