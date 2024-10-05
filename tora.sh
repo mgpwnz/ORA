@@ -62,23 +62,54 @@ install() {
     mkdir -p $HOME/tora
 
     while true; do
-        PK=""; MWSS=""; MHTTP=""; SWSS=""; SHTTP=""
+        PK=""
+        API=""
+        MWSS=""
+        MHTTP=""
+        SWSS=""
+        SHTTP=""
 
         check_empty PK "Private Key: "
-        check_empty MWSS "MAINNET WSS: "
-        check_empty MHTTP "MAINNET HTTP: "
         
+        echo "You can enter full URLs for the following or provide API key to auto-generate them."
+        echo "Enter 'skip' to auto-generate URLs from API key."
+        
+        read -p "MAINNET WSS: " MWSS_INPUT
+        if [ "$MWSS_INPUT" != "skip" ]; then
+            MWSS="$MWSS_INPUT"
+        fi
+
+        read -p "MAINNET HTTP: " MHTTP_INPUT
+        if [ "$MHTTP_INPUT" != "skip" ]; then
+            MHTTP="$MHTTP_INPUT"
+        fi
+
+        read -p "SEPOLIA WSS: " SWSS_INPUT
+        if [ "$SWSS_INPUT" != "skip" ]; then
+            SWSS="$SWSS_INPUT"
+        fi
+
+        read -p "SEPOLIA HTTP: " SHTTP_INPUT
+        if [ "$SHTTP_INPUT" != "skip" ]; then
+            SHTTP="$SHTTP_INPUT"
+        fi
+
+        if [ -z "$MWSS" ] || [ -z "$MHTTP" ] || [ -z "$SWSS" ] || [ -z "$SHTTP" ]; then
+            check_empty API "API Key: "
+            # Construct URLs based on the API key
+            MWSS=${MWSS:-"wss://eth-mainnet.g.alchemy.com/v2/$API"}
+            MHTTP=${MHTTP:-"https://eth-mainnet.g.alchemy.com/v2/$API"}
+            SWSS=${SWSS:-"wss://eth-sepolia.g.alchemy.com/v2/$API"}
+            SHTTP=${SHTTP:-"https://eth-sepolia.g.alchemy.com/v2/$API"}
+        fi
+
         echo "Choose network configuration:"
         select network in "mainnet" "sepolia"; do
             case $network in
                 mainnet)
-                    check_empty SWSS "SEPOLIA WSS: "
-                    check_empty SHTTP "SEPOLIA HTTP: "
                     break
                     ;;
                 sepolia)
-                    check_empty SWSS "SEPOLIA WSS: "
-                    check_empty SHTTP "SEPOLIA HTTP: "
                     break
                     ;;
             esac
@@ -192,41 +223,4 @@ switch_network() {
     fi
 
     # Update .env file with the new network choice
-    sed -i "s/CONFIRM_CHAINS=.*/CONFIRM_CHAINS='[\"$NETWORK\"]'/" "$HOME/tora/.env"
-    echo "Switched to $NETWORK configuration."
-}
-
-# Main functions for update and uninstall
-update() {
-    docker compose -f $HOME/tora/docker-compose.yml down
-    docker compose -f $HOME/tora/docker-compose.yml pull
-    docker compose -f $HOME/tora/docker-compose.yml up -d
-}
-
-uninstall() {
-    if [ -d "$HOME/tora" ]; then
-        read -r -p "Wipe all DATA? [y/N] " response
-        case "$response" in
-            [yY][eE][sS]|[yY]) 
-                docker compose -f $HOME/tora/docker-compose.yml down -v
-                rm -rf $HOME/tora
-                ;;
-            *)
-                echo "Canceled"
-                ;;
-        esac
-    fi
-}
-
-# Install wget if not present
-sudo apt install wget -y &>/dev/null
-cd
-
-# Execute the selected function
-if [ "$function" == "install" ]; then
-    install
-elif [ "$function" == "switch" ]; then
-    switch_network
-else
-    $function
-fi
+    sed -i "s/CONFIRM
