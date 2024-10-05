@@ -2,6 +2,7 @@
 
 # Default variables
 function="install"
+network="mainnet"
 
 # Options processing
 while test $# -gt 0; do
@@ -44,6 +45,8 @@ confirm_input() {
     echo "Private Key: $PK"
     echo "MAINNET WSS: $MWSS"
     echo "MAINNET HTTP: $MHTTP"
+    echo "SEPOLIA WSS: $SWSS"
+    echo "SEPOLIA HTTP: $SHTTP"
     
     read -p "Is this information correct? (yes/no): " CONFIRM
     CONFIRM=$(echo "$CONFIRM" | tr '[:upper:]' '[:lower:]')
@@ -59,16 +62,37 @@ install() {
     mkdir -p $HOME/tora
 
     while true; do
-        PK=""; MWSS=""; MHTTP=""
+        PK=""; MWSS=""; MHTTP=""; SWSS=""; SHTTP=""
+
         check_empty PK "Private Key: "
         check_empty MWSS "MAINNET WSS: "
         check_empty MHTTP "MAINNET HTTP: "
         
+        echo "Choose network configuration:"
+        select network in "mainnet" "sepolia"; do
+            case $network in
+                mainnet)
+                    check_empty SWSS "SEPOLIA WSS: "
+                    check_empty SHTTP "SEPOLIA HTTP: "
+                    break
+                    ;;
+                sepolia)
+                    check_empty SWSS "SEPOLIA WSS: "
+                    check_empty SHTTP "SEPOLIA HTTP: "
+                    break
+                    ;;
+            esac
+        done
+        
         if confirm_input; then break; fi
     done
 
-    # Set CONFIRM_CHAINS for mainnet
-    CONFIRM_CHAINS='["mainnet"]'
+    # Set CONFIRM_CHAINS based on selected network
+    if [ "$network" == "mainnet" ]; then
+        CONFIRM_CHAINS='["mainnet"]'
+    else
+        CONFIRM_CHAINS='["sepolia"]'
+    fi
 
     # Create docker-compose.yml
     cat <<EOF > $HOME/tora/docker-compose.yml
@@ -129,6 +153,8 @@ PRIV_KEY="$PK"
 TORA_ENV=production
 MAINNET_WSS="$MWSS"
 MAINNET_HTTP="$MHTTP"
+SEPOLIA_WSS="$SWSS"
+SEPOLIA_HTTP="$SHTTP"
 REDIS_TTL=86400000
 CONFIRM_CHAINS=$CONFIRM_CHAINS
 CONFIRM_MODELS='[13]'
