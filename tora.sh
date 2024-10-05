@@ -3,88 +3,73 @@
 function="install"
 # Options
 option_value(){ echo "$1" | sed -e 's%^--[^=]*=%%g; s%^-[^=]*=%%g'; }
+
 while test $# -gt 0; do
-        case "$1" in
-        -in|--install)
-            function="install"
-            shift
-            ;;
-        -up|--update)
-            function="update"
-            shift
-            ;;
-        -un|--uninstall)
-            function="uninstall"
-            shift
-            ;;
-        *|--)
-    break
-	;;
-	esac
-done
-install() {
-#docker install
-cd $HOME
-. <(wget -qO- https://raw.githubusercontent.com/mgpwnz/VS/main/docker.sh)
-#create dir and config
-if [ ! -d $HOME/tora ]; then
-  mkdir $HOME/tora
-fi
-sleep 1
-
-function check_empty {
-  local varname=$1
-  while [ -z "${!varname}" ]; do
-    read -p "$2" input
-    if [ -n "$input" ]; then
-      eval $varname=\"$input\"
-    else
-      echo "The value cannot be empty. Please try again."
-    fi
-  done
-}
-
-function confirm_input {
-  echo "You have entered the following information:"
-  echo "Private Key: $PK"
-  echo "MAINNET WSS: $MWSS"
-  echo "MAINNET HTTP: $MHTTP"
-  echo "SEPOLIA WSS: $SWSS"
-  echo "SEPOLIA HTTP: $SHTTP"
-  
-  read -p "Is this information correct? (yes/no): " CONFIRM
-  CONFIRM=$(echo "$CONFIRM" | tr '[:upper:]' '[:lower:]')
-  
-  if [ "$CONFIRM" != "yes" ] && [ "$CONFIRM" != "y" ]; then
-    echo "Let's try again..."
-    return 1 
-  fi
-  return 0 
-}
-
-while true; do
-  PK=""
-  MWSS=""
-  MHTTP=""
-  SWSS=""
-  SHTTP=""
-  
-  check_empty PK "Private Key: "
-  check_empty MWSS "MAINNET WSS: "
-  check_empty MHTTP "MAINNET HTTP: "
-  check_empty SWSS "SEPOLIA WSS: "
-  check_empty SHTTP "SEPOLIA HTTP: "
-  
-  confirm_input
-  if [ $? -eq 0 ]; then
-    break 
-  fi
+    case "$1" in
+        -in|--install) function="install" ;;
+        -s|--sepolia) function="sepolia" ;;
+        -up|--update) function="update" ;;
+        -mn|--mainnet) function="mainnet" ;;
+        -un|--uninstall) function="uninstall" ;;
+        *) break ;;
+    esac
+    shift
 done
 
-echo "All data is confirmed. Proceeding..."
+check_empty() {
+    local varname=$1
+    while [ -z "${!varname}" ]; do
+        read -p "$2" input
+        [ -n "$input" ] && eval $varname=\"$input\" || echo "The value cannot be empty. Please try again."
+    done
+}
 
-# Create script 
-tee $HOME/tora/docker-compose.yml > /dev/null <<EOF
+confirm_input() {
+    echo "You have entered the following information:"
+    echo "Private Key: $PK"
+    echo "MAINNET WSS: $MWSS"
+    echo "MAINNET HTTP: $MHTTP"
+    echo "SEPOLIA WSS: $SWSS"
+    echo "SEPOLIA HTTP: $SHTTP"
+    
+    read -p "Is this information correct? (yes/no): " CONFIRM
+    [ "${CONFIRM,,}" == "yes" ] || [ "${CONFIRM,,}" == "y" ]
+}
+
+gather_input() {
+    PK=""; MWSS=""; MHTTP=""; SWSS=""; SHTTP=""
+    check_empty PK "Private Key: "
+    check_empty MWSS "MAINNET WSS: "
+    check_empty MHTTP "MAINNET HTTP: "
+    check_empty SWSS "SEPOLIA WSS: "
+    check_empty SHTTP "SEPOLIA HTTP: "
+    while ! confirm_input; do echo "Let's try again..."; gather_input; done
+    echo "All data is confirmed. Proceeding..."
+}
+
+create_env_file() {
+    tee $HOME/tora/.env > /dev/null <<EOF
+############### Sensitive config ###############
+PRIV_KEY="$PK"
+############### General config ###############
+TORA_ENV=production
+MAINNET_WSS="$MWSS"
+MAINNET_HTTP="$MHTTP"
+SEPOLIA_WSS="$SWSS"
+SEPOLIA_HTTP="$SHTTP"
+REDIS_TTL=86400000 # 1 day in ms 
+############### App specific config ###############
+CONFIRM_CHAINS=$1
+CONFIRM_MODELS='[13]'
+CONFIRM_USE_CROSSCHECK=true
+CONFIRM_CC_POLLING_INTERVAL=3000
+CONFIRM_CC_BATCH_BLOCKS_COUNT=300
+CONFIRM_TASK_TTL=2592000000
+EOF
+}
+
+create_compose_file() {
+    tee $HOME/tora/docker-compose.yml > /dev/null <<EOF
 version: '3'
 services:
   confirm:
@@ -93,10 +78,8 @@ services:
     depends_on:
       - redis
       - openlm
-    command: 
-      - "--confirm"
-    env_file:
-      - ./.env
+    command: "--confirm"
+    env_file: ./.env
     environment:
       REDIS_HOST: 'redis'
       REDIS_PORT: 6379
@@ -125,81 +108,50 @@ services:
     environment:
       - "TZ=Asia/Shanghai"
       - "LOG_LEVEL=info"
-      - "LOG_JSON=false"
       - "DIUN_WATCH_WORKERS=5"
-      - "DIUN_WATCH_JITTER=30"
       - "DIUN_WATCH_SCHEDULE=0 0 * * *"
-      - "DIUN_PROVIDERS_DOCKER=true"
-      - "DIUN_PROVIDERS_DOCKER_WATCHBYDEFAULT=true"
     restart: always
-
 networks:
   private_network:
     driver: bridge
-
 EOF
-#env
-tee $HOME/tora/.env > /dev/null <<EOF
-############### Sensitive config ###############
-
-# private key for sending out app-specific transactions
-PRIV_KEY="$PK"
-
-############### General config ###############
-
-# general - execution environment
-TORA_ENV=production
-
-# general - provider url
-MAINNET_WSS="$MWSS"
-MAINNET_HTTP="$MHTTP"
-SEPOLIA_WSS="$SWSS"
-SEPOLIA_HTTP="$SHTTP"
-
-# redis global ttl, comment out -> no ttl limit
-REDIS_TTL=86400000 # 1 day in ms 
-
-############### App specific config ###############
-
-# confirm - general
-CONFIRM_CHAINS='["sepolia"]' # sepolia | mainnet ｜ '["sepolia","mainnet"]'
-CONFIRM_MODELS='[13]' # 13: OpenLM ,now only 13 supported
-# confirm - crosscheck
-CONFIRM_USE_CROSSCHECK=true
-CONFIRM_CC_POLLING_INTERVAL=3000 # 3 sec in ms
-CONFIRM_CC_BATCH_BLOCKS_COUNT=300 # default 300 means blocks in 1 hours on eth
-# confirm - store ttl
-CONFIRM_TASK_TTL=2592000000
-CONFIRM_TASK_DONE_TTL = 2592000000 # comment out -> no ttl limit
-CONFIRM_CC_TTL=2592000000 # 1 month in ms
-EOF
-#memory
-sysctl vm.overcommit_memory=1
-#Run nnode
-docker compose -f $HOME/tora/docker-compose.yml up -d
 }
+
+install() {
+    cd $HOME
+    . <(wget -qO- https://raw.githubusercontent.com/mgpwnz/VS/main/docker.sh)
+    [ ! -d $HOME/tora ] && mkdir $HOME/tora
+    sleep 1
+    gather_input
+    create_compose_file
+    create_env_file '["mainnet"]'
+    sysctl vm.overcommit_memory=1
+    docker compose -f $HOME/tora/docker-compose.yml up -d
+}
+
+sepolia() {
+    install
+    create_env_file '["sepolia"]'
+    docker compose -f $HOME/tora/docker-compose.yml up -d
+}
+
 update() {
-docker compose -f $HOME/tora/docker-compose.yml down
-docker compose -f $HOME/tora/docker-compose.yml pull
-docker compose -f $HOME/tora/docker-compose.yml up -d
+    docker compose -f $HOME/tora/docker-compose.yml down
+    docker compose -f $HOME/tora/docker-compose.yml pull
+    docker compose -f $HOME/tora/docker-compose.yml up -d
+}
 
-}
 uninstall() {
-if [ ! -d "$HOME/tora" ]; then
-    break
-fi
-read -r -p "Wipe all DATA? [y/N] " response
-case "$response" in
-    [yY][eE][sS]|[yY]) 
-docker compose -f $HOME/tora/docker-compose.yml down -v
-rm -rf $HOME/tora
-        ;;
-    *)
-	echo Canceled
-	break
-        ;;
-esac
+    [ ! -d "$HOME/tora" ] && return
+    read -r -p "Wipe all DATA? [y/N] " response
+    case "$response" in
+        [yY][eE][sS]|[yY]) 
+            docker compose -f $HOME/tora/docker-compose.yml down -v
+            rm -rf $HOME/tora ;;
+        *) echo "Canceled";;
+    esac
 }
+
 # Actions
 sudo apt install wget -y &>/dev/null
 cd
