@@ -223,4 +223,41 @@ switch_network() {
     fi
 
     # Update .env file with the new network choice
-    sed -i "s/CONFIRM
+    sed -i "s/CONFIRM_CHAINS=.*/CONFIRM_CHAINS='[\"$NETWORK\"]'/" "$HOME/tora/.env"
+    echo "Switched to $NETWORK configuration."
+}
+
+# Main functions for update and uninstall
+update() {
+    docker compose -f $HOME/tora/docker-compose.yml down
+    docker compose -f $HOME/tora/docker-compose.yml pull
+    docker compose -f $HOME/tora/docker-compose.yml up -d
+}
+
+uninstall() {
+    if [ -d "$HOME/tora" ]; then
+        read -r -p "Wipe all DATA? [y/N] " response
+        case "$response" in
+            [yY][eE][sS]|[yY]) 
+                docker compose -f $HOME/tora/docker-compose.yml down -v
+                rm -rf $HOME/tora
+                ;;
+            *)
+                echo "Canceled"
+                ;;
+        esac
+    fi
+}
+
+# Install wget if not present
+sudo apt install wget -y &>/dev/null
+cd
+
+# Execute the selected function
+if [ "$function" == "install" ]; then
+    install
+elif [ "$function" == "switch" ]; then
+    switch_network
+else
+    $function
+fi
