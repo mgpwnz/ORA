@@ -35,17 +35,16 @@ install() {
     fi
     sleep 1
 
-    # Temporary file for output
-    temp_file=$(mktemp)
-
     # Run docker command and save output to temp file
-    docker run -v "$HOME/nillion/verifier:/var/tmp" nillion/verifier:v1.0.1 initialise > "$temp_file"
+    docker run -v "$HOME/nillion/verifier:/var/tmp" nillion/verifier:v1.0.1 initialise &>/dev/null
 
-    # Output "Verifier account id" line to console
-    grep "Verifier account id:" "$temp_file"
-
-    # Display private key
-    cat "$HOME/nillion/verifier/credentials.json"
+    # Display private key if exists
+    if [ -f "$HOME/nillion/verifier/credentials.json" ]; then
+        cat "$HOME/nillion/verifier/credentials.json"
+    else
+        echo "Error: credentials.json not found."
+        return 1
+    fi
 
     # Pause the script and wait for user input
     read -p "Press Enter to continue..."
