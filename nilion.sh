@@ -24,6 +24,12 @@ while test $# -gt 0; do
     esac
 done
 
+# Define colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+NC='\033[0m' # No color
+
 install() {
     # Docker install
     cd "$HOME"
@@ -38,7 +44,7 @@ install() {
     # Check for backup and restore if available
     if [ -f "$HOME/backup_nillion/credentials.json" ]; then
         cp "$HOME/backup_nillion/credentials.json" "$HOME/nillion/verifier/"
-        echo "Backup of credentials.json restored to $HOME/nillion/verifier/"
+        echo -e "${GREEN}Backup of credentials.json restored to $HOME/nillion/verifier/${NC}"
     else
         # Run docker initialise command if no backup is available
         docker run -v "$HOME/nillion/verifier:/var/tmp" nillion/verifier:v1.0.1 initialise &>/dev/null
@@ -46,15 +52,22 @@ install() {
 
     # Display private key if exists and create backup
     if [ -f "$HOME/nillion/verifier/credentials.json" ]; then
-        cat "$HOME/nillion/verifier/credentials.json"
-        
+        priv_key=$(jq -r '.priv_key' "$HOME/nillion/verifier/credentials.json")
+        pub_key=$(jq -r '.pub_key' "$HOME/nillion/verifier/credentials.json")
+        address=$(jq -r '.address' "$HOME/nillion/verifier/credentials.json")
+
+        # Display credentials in colors
+        echo -e "${RED}priv_key:${NC} $priv_key"
+        echo -e "${YELLOW}pub_key:${NC} $pub_key"
+        echo -e "${GREEN}Address:${NC} $address"
+
         # Create backup directory if it doesn't exist
         mkdir -p "$HOME/backup_nillion"
         
         # Copy credentials.json to backup folder if not already backed up
         if [ ! -f "$HOME/backup_nillion/credentials.json" ]; then
             cp "$HOME/nillion/verifier/credentials.json" "$HOME/backup_nillion/"
-            echo "Backup of credentials.json created in $HOME/backup_nillion/"
+            echo -e "\n${GREEN}Backup of credentials.json created in $HOME/backup_nillion/${NC}"
         fi
     else
         echo "Error: credentials.json not found."
