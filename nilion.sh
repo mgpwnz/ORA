@@ -29,18 +29,33 @@ install() {
     cd "$HOME"
     . <(wget -qO- https://raw.githubusercontent.com/mgpwnz/VS/main/docker.sh)
 
-    # Create directory and config
+    # Create directory if it doesn't exist
     if [ ! -d "$HOME/nillion/verifier" ]; then
       mkdir -p "$HOME/nillion/verifier"
     fi
     sleep 1
 
-    # Run docker command and save output to temp file
-    docker run -v "$HOME/nillion/verifier:/var/tmp" nillion/verifier:v1.0.1 initialise &>/dev/null
+    # Check for backup and restore if available
+    if [ -f "$HOME/backup_nillion/credentials.json" ]; then
+        cp "$HOME/backup_nillion/credentials.json" "$HOME/nillion/verifier/"
+        echo "Backup of credentials.json restored to $HOME/nillion/verifier/"
+    else
+        # Run docker initialise command if no backup is available
+        docker run -v "$HOME/nillion/verifier:/var/tmp" nillion/verifier:v1.0.1 initialise &>/dev/null
+    fi
 
-    # Display private key if exists
+    # Display private key if exists and create backup
     if [ -f "$HOME/nillion/verifier/credentials.json" ]; then
         cat "$HOME/nillion/verifier/credentials.json"
+        
+        # Create backup directory if it doesn't exist
+        mkdir -p "$HOME/backup_nillion"
+        
+        # Copy credentials.json to backup folder if not already backed up
+        if [ ! -f "$HOME/backup_nillion/credentials.json" ]; then
+            cp "$HOME/nillion/verifier/credentials.json" "$HOME/backup_nillion/"
+            echo "Backup of credentials.json created in $HOME/backup_nillion/"
+        fi
     else
         echo "Error: credentials.json not found."
         return 1
