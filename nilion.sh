@@ -47,6 +47,9 @@ install() {
     # Display private key
     cat "$HOME/nillion/verifier/credentials.json"
 
+    # Pause the script and wait for user input
+    read -p "Press Enter to continue..."
+
     # Start node
     docker run -v "$HOME/nillion/verifier:/var/tmp" nillion/verifier:v1.0.1 verify --rpc-endpoint "https://testnet-nillion-rpc.lavenderfive.com"
 
