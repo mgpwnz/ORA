@@ -5,14 +5,28 @@ COMPOSE_FILE="$HOME/tora/docker-compose.yml"
 CHECK_SCRIPT="/usr/local/bin/check_and_start_node.sh"
 SERVICE_FILE="/etc/systemd/system/check_node.service"
 
-# Створення скрипту для перевірки та запуску контейнера
-echo "Створюю скрипт перевірки стану контейнера..."
+# Створення скрипту для перевірки стану контейнерів
+echo "Створюю скрипт перевірки стану контейнерів..."
 cat << EOF | sudo tee $CHECK_SCRIPT > /dev/null
 #!/bin/bash
-if [ -n "\$(docker compose -f "$COMPOSE_FILE" ps -q)" ]; then
-  echo "Нода працює."
+
+# Імена контейнерів, які потрібно перевірити
+containers=("ora-tora" "ora-openlm" "ora-redis" "diun")
+
+# Перевірка кожного контейнера
+all_running=true
+for container in "\${containers[@]}"; do
+  if ! docker compose -f "$COMPOSE_FILE" ps "\$container" | grep -q "Up"; then
+    echo "Контейнер \$container не запущений."
+    all_running=false
+  fi
+done
+
+# Якщо всі контейнери запущені
+if [ "\$all_running" = true ]; then
+  echo "Всі контейнери працюють."
 else
-  echo "Нода не запущена. Запускаю..."
+  echo "Не всі контейнери запущені. Запускаю всю конфігурацію..."
   docker compose -f "$COMPOSE_FILE" up -d
 fi
 EOF
@@ -24,7 +38,7 @@ sudo chmod +x $CHECK_SCRIPT
 echo "Створюю systemd сервіс..."
 cat << EOF | sudo tee $SERVICE_FILE > /dev/null
 [Unit]
-Description=Перевірка та запуск ноди Docker Compose
+Description=Перевірка та запуск контейнерів Docker Compose
 After=docker.service
 Requires=docker.service
 
@@ -41,7 +55,7 @@ TIMER_FILE="/etc/systemd/system/check_node.timer"
 echo "Створюю таймер для періодичного запуску..."
 cat << EOF | sudo tee $TIMER_FILE > /dev/null
 [Unit]
-Description=Перевірка та запуск ноди кожні 5 хвилин
+Description=Перевірка та запуск контейнерів кожні 5 хвилин
 
 [Timer]
 OnBootSec=1min
