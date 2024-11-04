@@ -11,12 +11,12 @@ cat << EOF | sudo tee $CHECK_SCRIPT > /dev/null
 #!/bin/bash
 
 # Імена контейнерів, які потрібно перевірити
-containers=("ora-tora" "ora-openlm" "ora-redis" "diun")
+containers=("ora-openlm" "ora-redis" "ora-tora" "diun")
 
-# Перевірка кожного контейнера
+# Перевірка кожного контейнера за фактичними іменами
 all_running=true
 for container in "\${containers[@]}"; do
-  if ! docker compose -f "$COMPOSE_FILE" ps "\$container" | grep -q "Up"; then
+  if ! docker ps --filter "name=\$container" --filter "status=running" | grep -q "\$container"; then
     echo "Контейнер \$container не запущений."
     all_running=false
   fi
