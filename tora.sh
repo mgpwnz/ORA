@@ -127,7 +127,6 @@ install() {
 
     # Create docker-compose.yml
     cat <<EOF > $HOME/tora/docker-compose.yml
-version: '3'
 services:
   confirm:
     image: oraprotocol/tora:confirm
